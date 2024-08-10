@@ -1,0 +1,14 @@
+{
+  "name": "cashtokens-distro",
+  "type": "module",
+  "version": "0.1.0",
+  "repository": "https://github.com/foldingcash/cashtokens-distro.git",
+  "author": "FoldingCash LLC",
+  "license": "MIT",
+  "dependencies": {
+    "prompt-sync": "^4.2.0"
+  },
+  "scripts": {
+    "start": "node ./index.js"
+  }
+}
