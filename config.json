@@ -1,3 +1,4 @@
 {
-    "DistroApi": "https://api.folding.cash/"
+    "Network": "chipnet",
+    "DistroApi": "--DistroApi Url--"
 }

@@ -6,6 +6,7 @@
   "author": "FoldingCash LLC",
   "license": "MIT",
   "dependencies": {
+    "cashscript": "^0.9.3",
     "prompt-sync": "^4.2.0"
   },
   "scripts": {
