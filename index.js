@@ -47,9 +47,11 @@ async function getDistriubtion(amount) {
     url.searchParams.append('amount', amount);
     url.searchParams.append('includeFoldingUserTypes', 8);
 
+    console.log('fetching distribution from', url);
     const serverResponse = await fetch(url);
 
     if (serverResponse.status != 200) {
+        console.error('Server returned a non 200 status', serverResponse.status, serverResponse);
         throw Error('Unable to continue, there was a problem getting the distribution', serverResponse);
     }
 
@@ -59,7 +61,7 @@ async function getDistriubtion(amount) {
         throw Error('Unable to continue, the received distribution has no users');
     }
 
-    await fs.writeFile('FoldingAtHome_Distribution.json', response); // for book keeping
+    await fs.writeFile('FoldingAtHome_Distribution.json', JSON.stringify(response)); // for book keeping
 
     return response;
 }
@@ -106,13 +108,20 @@ async function main() {
     const provider = new ElectrumNetworkProvider(config.Network);
 
     const inputs = await provider.getUtxos(address);
+    console.log('Found UTXOs', inputs);
     validateInputs(inputs);
 
     const { tokenInput, fundInput, satoshis } = getInputs(inputs);
 
-    const { distroCount, distro } = await getDistriubtion(tokenInput.token.amount);
+    const distroAmount = tokenInput.token.amount / 100000000n;
+    if(distroAmount * 100000000n != tokenInput.token.amount) {
+        throw Error('Need to enhance the script and server...the distro amount requires more precision');
+    }
+    const { distroCount, distro } = await getDistriubtion(distroAmount);
 
-    if (distroCount * Dust * 2 <= satoshis) { // Not a perfect calculation...
+    const minimumAmount = BigInt(distroCount) * Dust * 2n;
+    if (satoshis < minimumAmount) { // Not a perfect calculation...
+        console.log('Calculated fees', BigInt(distroCount), Dust, minimumAmount, satoshis);
         throw Error('There is not enough satoshis to cover the distribution');
     }
 
@@ -127,9 +136,9 @@ async function main() {
         let distributedTokens = 0n;
         for (let index = 0; index < distroCount; index++) {
             const folder = distro[index];
-            const tokenAmount = (folder.amount * 100000000); // A precision of eight decimals is returned in the distro response but the transaction builder needs the non-decimal amount
+            const tokenAmount = BigInt(folder.amount * 100000000); // A precision of eight decimals is returned in the distro response but the transaction builder needs the non-decimal amount
             builder.addOutput({
-                to: folder.cashTokensAddress,
+                to: folder.cashTokensAddress.startsWith('bitcoincash:') ? folder.cashTokensAddress : `bitcoincash:${folder.cashTokensAddress}`,
                 amount: Dust,
                 token: {
                     amount: tokenAmount,

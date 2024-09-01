@@ -8,8 +8,8 @@ import {
   } from '@bitauth/libauth';
   import { SignatureTemplate, Network } from 'cashscript';
   
-  import config from '../config.json' assert { type: 'json' };
-  import wallet from '../wallet.json' assert { type: 'json' };
+  import config from './config.json' assert { type: 'json' };
+  import wallet from './wallet.json' assert { type: 'json' };
   
   export default async function getWallet() {
     const secp256k1 = await instantiateSecp256k1();
