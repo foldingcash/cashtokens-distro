@@ -6,6 +6,30 @@ import getWallet from './getWallet.js';
 
 import config from './config.json' assert { type: 'json' };
 
+async function sendTransaction(buildFunc) {
+    let transaction = buildFunc(Dust * 2n);
+    const transactionHex = await transaction.build();
+    const transactionBytes = BigInt(transactionHex.length) / 2n;
+    transaction = buildFunc(transactionBytes + 1n);
+
+    const shouldSend = promptBool('Send transaction (no)? ', 'false');
+    if (shouldSend) {
+        console.log('broadcasting transaction...');
+        const response = await transaction.send();
+        console.log(response);
+    } else {
+        console.log('skipping broadcasting transaction...');
+        console.log(`transaction hex: ${await transaction.build()}`)
+        console.log('transaction', transaction);
+        transaction.inputs.forEach(input => {
+            console.log('token input', input.token)
+        });
+        transaction.outputs.forEach(output => {
+            console.log('token output', output.token)
+        });
+    }
+}
+
 async function getDistriubtion(amount) {
     const startDate = promptDate('Start date? ');
     const endDate = promptDate('End date? ');
@@ -76,7 +100,6 @@ function getInputs(inputs) {
 }
 
 const Dust = 1000n;
-const SatoshisPerByteTransactionFee = 1n;
 
 async function main() {
     const { address, signatureTemplate } = await getWallet();
@@ -93,37 +116,43 @@ async function main() {
         throw Error('There is not enough satoshis to cover the distribution');
     }
 
-    const builder = new TransactionBuilder({ provider });
-    builder.addInput(tokenInput, signatureTemplate.unlockP2PKH());
-    if (!!fundInput) {
-        builder.addInput(fundInput, signatureTemplate.unlockP2PKH());
-    }
+    const build = fee => {
+        const builder = new TransactionBuilder({ provider });
+        builder.addInput(tokenInput, signatureTemplate.unlockP2PKH());
+        if (!!fundInput) {
+            builder.addInput(fundInput, signatureTemplate.unlockP2PKH());
+        }
 
-    let changeSatoshis = satoshis;
-    let distributedTokens = 0n;
-    for (let index = 0; index < distroCount; index++) {
-        const folder = distro[index];
-        const tokenAmount = (folder.amount * 100000000); // A precision of eight decimals is returned in the distro response but the transaction builder needs the non-decimal amount
+        let changeSatoshis = satoshis;
+        let distributedTokens = 0n;
+        for (let index = 0; index < distroCount; index++) {
+            const folder = distro[index];
+            const tokenAmount = (folder.amount * 100000000); // A precision of eight decimals is returned in the distro response but the transaction builder needs the non-decimal amount
+            builder.addOutput({
+                to: folder.cashTokensAddress,
+                amount: Dust,
+                token: {
+                    amount: tokenAmount,
+                    category: tokenInput.token.category,
+                }
+            });
+            changeSatoshis -= Dust;
+            distributedTokens += tokenAmount;
+        }
+
+        if (distributedTokens !== tokenInput.token.amount) {
+            throw Error('The total distribution amount does not equal the expected amount');
+        }
+
         builder.addOutput({
-            to: folder.cashTokensAddress,
-            amount: Dust,
-            token: {
-                amount: tokenAmount,
-                category: tokenInput.token.category,
-            }
+            to: address,
+            amount: changeSatoshis - fee,
         });
-        changeSatoshis -= Dust;
-        distributedTokens += tokenAmount;
+
+        return builder;
     }
 
-    if (distributedTokens !== tokenInput.token.amount) {
-        throw Error('The total distribution amount does not equal the expected amount');
-    }
-
-    builder.addOutput({
-        to: address,
-        amount: changeSatoshis,
-    });
+    await sendTransaction(build);
 }
 
 try {
