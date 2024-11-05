@@ -66,7 +66,7 @@ async function getDistriubtion(amount) {
     return response;
 }
 
-function validateInputs(inputs) {
+function validateInputs({ inputs, address }) {
     if (inputs.length === 0) {
         throw Error('There are no inputs available');
     }
@@ -109,7 +109,7 @@ async function main() {
 
     const inputs = await provider.getUtxos(address);
     console.log('Found UTXOs', inputs);
-    validateInputs(inputs);
+    validateInputs({ inputs, address });
 
     const { tokenInput, fundInput, satoshis } = getInputs(inputs);
 
