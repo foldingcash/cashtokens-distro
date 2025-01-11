@@ -132,11 +132,15 @@ async function main() {
             builder.addInput(fundInput, signatureTemplate.unlockP2PKH());
         }
 
-        let changeSatoshis = satoshis;
+        builder.addOutput({
+            to: address,
+            amount: satoshis - (BigInt(distroCount) * Dust) - fee,
+        });
+
         let distributedTokens = 0n;
         for (let index = 0; index < distroCount; index++) {
             const folder = distro[index];
-            const tokenAmount = BigInt(folder.amount * 100000000); // A precision of eight decimals is returned in the distro response but the transaction builder needs the non-decimal amount
+            const tokenAmount = BigInt(Math.floor(folder.amount * 100000000)); // A precision of eight decimals is returned in the distro response but the transaction builder needs the non-decimal amount
             builder.addOutput({
                 to: folder.cashTokensAddress.startsWith('bitcoincash:') ? folder.cashTokensAddress : `bitcoincash:${folder.cashTokensAddress}`,
                 amount: Dust,
@@ -145,18 +149,12 @@ async function main() {
                     category: tokenInput.token.category,
                 }
             });
-            changeSatoshis -= Dust;
             distributedTokens += tokenAmount;
         }
 
         if (distributedTokens !== tokenInput.token.amount) {
             throw Error('The total distribution amount does not equal the expected amount');
         }
-
-        builder.addOutput({
-            to: address,
-            amount: changeSatoshis - fee,
-        });
 
         return builder;
     }
