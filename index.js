@@ -89,12 +89,12 @@ function getInputs(inputs) {
     for (let index = 0; index < inputs.length; index++) {
         const input = inputs[index];
 
-        satoshis += input.satoshis;
-
         if (!!input.token) {
             tokenInput = input;
+            satoshis += input.satoshis;
         } else {
             fundInput = input;
+            satoshis += input.satoshis;
         }
     }
 
