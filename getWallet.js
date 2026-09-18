@@ -8,8 +8,8 @@ import {
   } from '@bitauth/libauth';
   import { SignatureTemplate, Network } from 'cashscript';
   
-  import config from './config.json' assert { type: 'json' };
-  import wallet from './wallet.json' assert { type: 'json' };
+  import config from './config.json' with { type: 'json' };
+  import wallet from './wallet.json' with { type: 'json' };
   
   export default async function getWallet() {
     const secp256k1 = await instantiateSecp256k1();
@@ -23,6 +23,6 @@ import {
     const pubKeyBin = secp256k1.derivePublicKeyCompressed(decodedWif.privateKey);
     const pubKeyHex = binToHex(pubKeyBin);
     const pubKeyHash = ripemd160.hash(sha256.hash(pubKeyBin));
-    const address = encodeCashAddress(config.Network === Network.MAINNET ? 'bitcoincash' : 'bchtest', 'p2pkhWithTokens', pubKeyHash);
+    const address = encodeCashAddress({ prefix: config.Network === Network.MAINNET ? 'bitcoincash' : 'bchtest', type: 'p2pkhWithTokens', payload: pubKeyHash }).address;
     return { privateKey, signatureTemplate, pubKeyBin, pubKeyHex, pubKeyHash, address };
   }

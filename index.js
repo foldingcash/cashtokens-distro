@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import { promptDate, promptInt, promptBool } from './prompt.js';
 import getWallet from './getWallet.js';
 
-import config from './config.json' assert { type: 'json' };
+import config from './config.json' with { type: 'json' };
 
 async function sendTransaction(buildFunc) {
     let transaction = buildFunc(Dust * 2n);
