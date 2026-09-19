@@ -13,3 +13,9 @@
 
 v21.6.0 - current
 v22.17.0 - error on run
+# web
+
+A browser-based UI (React + Vite) that replaces the CLI above for day-to-day use:
+a read-only work-completed report, and a guided token distribution flow with an
+explicit confirm/cancel step before anything is broadcast. See `web/README.md`
+for setup.
