@@ -5,7 +5,7 @@ import DateRangeForm from './DateRangeForm.jsx';
 import SummaryStats from './SummaryStats.jsx';
 import DistroTable, { truncateAddress } from './DistroTable.jsx';
 import ErrorNotice from './ErrorNotice.jsx';
-import { formatNumber, formatPercent } from '../lib/format.js';
+import { formatDateTime, formatNumber, formatPercent } from '../lib/format.js';
 
 /**
  * Workflow 1: a read-only report. No amount is chosen — it's always run
@@ -80,6 +80,14 @@ export default function ReportView() {
 
       {report && (
         <>
+          <p className="report-range">
+            <span>
+              <span className="report-range__label">Start</span> {formatDateTime(report.startDateTime)}
+            </span>
+            <span>
+              <span className="report-range__label">End</span> {formatDateTime(report.endDateTime)}
+            </span>
+          </p>
           <SummaryStats
             stats={[
               { label: 'Recipients', value: report.distroCount },

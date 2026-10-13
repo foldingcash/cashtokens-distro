@@ -33,6 +33,21 @@ export function formatDateForApi(dateInput) {
   return date.toLocaleDateString('en-US');
 }
 
+/** Format an API timestamp (ISO 8601, UTC) in the viewer's local time, e.g. "Sep 1, 2026, 2:49 AM PDT". */
+export function formatDateTime(isoString) {
+  if (!isoString) return '—';
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  });
+}
+
 /** Convert a <input type="date"> value (YYYY-MM-DD) into a Date at local midnight. */
 export function parseDateInputValue(value) {
   if (!value) return null;
