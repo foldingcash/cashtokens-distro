@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useWallet } from '../state/WalletContext.jsx';
+import { useSettings } from '../state/SettingsContext.jsx';
 import {
   getWalletInputs,
   getDistroAmountFromTokenInput,
@@ -22,6 +23,7 @@ import { formatNumber, satoshisToBch } from '../lib/format.js';
  */
 export default function DistributeView() {
   const { wallet } = useWallet();
+  const { settings } = useSettings();
 
   const [walletInputs, setWalletInputs] = useState(null);
   const [distroAmount, setDistroAmount] = useState(null);
@@ -74,7 +76,7 @@ export default function DistributeView() {
     setSendResult(null);
     setSendError(null);
     try {
-      const result = await getDistribution(startDate, endDate, distroAmount);
+      const result = await getDistribution(startDate, endDate, distroAmount, settings.apiUrl);
       setReport(result);
       setLastRange({ startDate, endDate });
     } catch (err) {

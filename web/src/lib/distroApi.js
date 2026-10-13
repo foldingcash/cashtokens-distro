@@ -11,9 +11,10 @@ import { AppError } from './errors.js';
  * @param {Date} startDate
  * @param {Date} endDate
  * @param {number|bigint} amount
+ * @param {string} [apiUrl] base URL of the API, ending in a slash
  */
-export async function getDistribution(startDate, endDate, amount) {
-  const url = new URL('v1/GetDistro', DISTRO_API);
+export async function getDistribution(startDate, endDate, amount, apiUrl = DISTRO_API) {
+  const url = new URL('v1/GetDistro', apiUrl);
   url.searchParams.append('startDate', formatDateForApi(startDate));
   url.searchParams.append('endDate', formatDateForApi(endDate));
   url.searchParams.append('amount', amount.toString());
@@ -25,7 +26,7 @@ export async function getDistribution(startDate, endDate, amount) {
   } catch (cause) {
     throw new AppError(
       'network',
-      `Could not reach the distribution API at ${DISTRO_API}. This may be a network problem, or the ` +
+      `Could not reach the distribution API at ${apiUrl}. This may be a network problem, or the ` +
         'API may not allow requests from this browser app (CORS). Check your connection and try again.',
       { cause, url: url.toString() },
     );

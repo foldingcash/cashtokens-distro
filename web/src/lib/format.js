@@ -33,8 +33,11 @@ export function formatDateForApi(dateInput) {
   return date.toLocaleDateString('en-US');
 }
 
-/** Format an API timestamp (ISO 8601, UTC) in the viewer's local time, e.g. "Sep 1, 2026, 2:49 AM PDT". */
-export function formatDateTime(isoString) {
+/**
+ * Format an API timestamp (ISO 8601, UTC) for display, e.g. "Sep 1, 2026, 9:49 AM UTC".
+ * timeZone is the display setting: 'UTC', or 'local' for the viewer's own time zone.
+ */
+export function formatDateTime(isoString, timeZone = 'UTC') {
   if (!isoString) return '—';
   const date = new Date(isoString);
   if (Number.isNaN(date.getTime())) return '—';
@@ -45,6 +48,7 @@ export function formatDateTime(isoString) {
     hour: 'numeric',
     minute: '2-digit',
     timeZoneName: 'short',
+    timeZone: timeZone === 'local' ? undefined : 'UTC',
   });
 }
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { getDistribution } from '../lib/distroApi.js';
-import { DEFAULT_REPORT_AMOUNT } from '../config.js';
+import { useSettings } from '../state/SettingsContext.jsx';
 import DateRangeForm from './DateRangeForm.jsx';
 import SummaryStats from './SummaryStats.jsx';
 import DistroTable, { truncateAddress } from './DistroTable.jsx';
@@ -13,6 +13,8 @@ import { formatDateTime, formatNumber, formatPercent } from '../lib/format.js';
  * chain or moves any tokens.
  */
 export default function ReportView() {
+  const { settings } = useSettings();
+  const reportAmount = settings.reportAmount;
   const [report, setReport] = useState(null);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -22,9 +24,9 @@ export default function ReportView() {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await getDistribution(startDate, endDate, DEFAULT_REPORT_AMOUNT);
+      const result = await getDistribution(startDate, endDate, reportAmount, settings.apiUrl);
       setReport(result);
-      setRange({ startDate, endDate });
+      setRange({ startDate, endDate, amount: reportAmount });
     } catch (err) {
       setError(err);
       setReport(null);
@@ -58,7 +60,7 @@ export default function ReportView() {
     },
     {
       key: 'amount',
-      label: `Reference amount (of ${DEFAULT_REPORT_AMOUNT})`,
+      label: `Reference amount (of ${range?.amount})`,
       sortable: true,
       accessor: (r) => r.amount,
       render: (r) => formatNumber(r.amount),
@@ -69,7 +71,7 @@ export default function ReportView() {
     <div className="view">
       <p className="view__intro">
         See a summary of work completed over a date range, and how it breaks out per user. This uses a
-        fixed reference amount of {DEFAULT_REPORT_AMOUNT} tokens to compute proportional shares —
+        fixed reference amount of {reportAmount} tokens to compute proportional shares —
         nothing is sent on-chain from this view.
       </p>
       <div className="card">
@@ -82,10 +84,10 @@ export default function ReportView() {
         <>
           <p className="report-range">
             <span>
-              <span className="report-range__label">Start</span> {formatDateTime(report.startDateTime)}
+              <span className="report-range__label">Start</span> {formatDateTime(report.startDateTime, settings.timeZone)}
             </span>
             <span>
-              <span className="report-range__label">End</span> {formatDateTime(report.endDateTime)}
+              <span className="report-range__label">End</span> {formatDateTime(report.endDateTime, settings.timeZone)}
             </span>
           </p>
           <SummaryStats
@@ -93,7 +95,7 @@ export default function ReportView() {
               { label: 'Recipients', value: report.distroCount },
               { label: 'Total work units', value: report.totalWorkUnits },
               { label: 'Total points', value: report.totalPoints },
-              { label: `Total (of ${DEFAULT_REPORT_AMOUNT})`, value: report.totalDistro, decimals: 8 },
+              { label: `Total (of ${range.amount})`, value: report.totalDistro, decimals: 8 },
             ]}
           />
           <DistroTable rows={report.distro} columns={columns} defaultSortKey="pointsGained" />

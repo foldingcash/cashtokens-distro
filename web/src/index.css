@@ -35,9 +35,20 @@ body {
 
 .app__header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.app__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app__header-actions .button {
+  padding: 6px 12px;
+  font-size: 0.85rem;
 }
 
 .app__header h1 {
@@ -188,13 +199,18 @@ body {
   color: var(--text-dim);
 }
 
-.field input {
+.field input,
+.field select {
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 8px 10px;
   color: var(--text);
   font-size: 0.95rem;
+}
+
+.field-hint {
+  font-size: 0.8rem;
 }
 
 .field-error {
@@ -409,6 +425,24 @@ th {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.settings-form {
+  max-width: 480px;
+  gap: 16px;
+}
+
+.settings-form__static {
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.settings-form__actions {
+  align-items: center;
+}
+
+.settings-form__actions .link-button {
+  margin-right: auto;
 }
 
 .confirm-summary {
