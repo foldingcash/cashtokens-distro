@@ -1,15 +1,16 @@
 import { ElectrumNetworkProvider, TransactionBuilder } from 'cashscript';
-import { NETWORK, DUST } from '../config.js';
+import { DUST } from '../config.js';
 import { AppError } from './errors.js';
+import { toNetworkAddress } from './network.js';
 
-let providerInstance;
+const providers = new Map();
 
-/** A single shared ElectrumNetworkProvider for the configured network. */
-export function getProvider() {
-  if (!providerInstance) {
-    providerInstance = new ElectrumNetworkProvider(NETWORK);
+/** A shared ElectrumNetworkProvider per network. */
+export function getProvider(network) {
+  if (!providers.has(network)) {
+    providers.set(network, new ElectrumNetworkProvider(network));
   }
-  return providerInstance;
+  return providers.get(network);
 }
 
 /**
@@ -20,8 +21,8 @@ export function getProvider() {
  * but fails with a clear error instead of silently picking one when there's
  * more than that, so nothing is ever sent from the wrong UTXO.
  */
-export async function getWalletInputs(address) {
-  const provider = getProvider();
+export async function getWalletInputs(address, network) {
+  const provider = getProvider(network);
   let utxos;
   try {
     utxos = await provider.getUtxos(address);
@@ -73,19 +74,55 @@ export async function getWalletInputs(address) {
 
 /**
  * The whole-token distribution amount available from the token input.
- * The chain stores amounts with 8 decimal places; the API works in whole
- * tokens, so this must divide evenly.
+ * The chain stores amounts in base units (`decimals` places); the API works
+ * in whole tokens, so this must divide evenly.
  */
-export function getDistroAmountFromTokenInput(tokenInput) {
-  const amount = tokenInput.token.amount / 100000000n;
-  if (amount * 100000000n !== tokenInput.token.amount) {
+export function getDistroAmountFromTokenInput(tokenInput, decimals) {
+  const scale = 10n ** BigInt(decimals);
+  const amount = tokenInput.token.amount / scale;
+  if (amount * scale !== tokenInput.token.amount) {
     throw new AppError(
       'precision',
-      'The token amount held in the wallet does not divide evenly into whole tokens, so a distribution ' +
-        'amount cannot be computed for it.',
+      `The wallet holds ${tokenInput.token.amount} base units of the token, which does not divide evenly ` +
+        `into whole tokens at ${decimals} decimals, so a distribution amount cannot be computed for it. ` +
+        'Check the token decimals in Settings.',
     );
   }
   return amount;
+}
+
+/**
+ * Converts each recipient's API amount (whole tokens, up to 8 decimals) into
+ * on-chain base units. Rounding is by largest remainder so the base units
+ * always sum to exactly `total`; with 8 decimals the API amounts are already
+ * exact and this matches plain rounding. Recipients whose share rounds to
+ * zero base units are dropped, since a token output can't carry 0 tokens.
+ */
+export function allocateTokenAmounts(distro, total, decimals) {
+  const scale = 10 ** decimals;
+  const shares = distro.map((folder) => {
+    const exact = folder.amount * scale;
+    const floor = Math.floor(exact);
+    return { folder, tokenAmount: BigInt(floor), remainder: exact - floor };
+  });
+
+  const leftover = total - shares.reduce((sum, share) => sum + share.tokenAmount, 0n);
+  if (leftover < 0n || leftover > BigInt(shares.length)) {
+    throw new AppError(
+      'distribution-mismatch',
+      `The distribution API's amounts do not add up to the ${total} base units held in the wallet. ` +
+        'Refusing to build the transaction.',
+    );
+  }
+  [...shares]
+    .sort((a, b) => b.remainder - a.remainder)
+    .slice(0, Number(leftover))
+    .forEach((share) => {
+      share.tokenAmount += 1n;
+    });
+
+  const recipients = shares.filter((share) => share.tokenAmount > 0n);
+  return { recipients, skippedCount: shares.length - recipients.length };
 }
 
 /** The minimum satoshis required to cover dust on every output, matching the CLI's rough check. */
@@ -104,14 +141,24 @@ export function getMinimumSatoshisRequired(distroCount) {
  */
 export async function prepareDistributionTransaction({
   address,
+  network,
   signatureTemplate,
   tokenInput,
   fundInput,
   satoshis,
   distroCount,
   distro,
+  decimals,
 }) {
-  const minimumAmount = getMinimumSatoshisRequired(distroCount);
+  const { recipients, skippedCount } = allocateTokenAmounts(
+    distro.slice(0, distroCount),
+    tokenInput.token.amount,
+    decimals,
+  );
+  const recipientAddresses = recipients.map(({ folder }) => toNetworkAddress(folder.cashTokensAddress, network));
+  const recipientCount = recipients.length;
+
+  const minimumAmount = getMinimumSatoshisRequired(recipientCount);
   if (satoshis < minimumAmount) {
     throw new AppError(
       'insufficient-funds',
@@ -121,7 +168,7 @@ export async function prepareDistributionTransaction({
     );
   }
 
-  const provider = getProvider();
+  const provider = getProvider(network);
 
   const build = (fee) => {
     const builder = new TransactionBuilder({ provider });
@@ -132,19 +179,13 @@ export async function prepareDistributionTransaction({
 
     builder.addOutput({
       to: address,
-      amount: satoshis - BigInt(distroCount) * DUST - fee,
+      amount: satoshis - BigInt(recipientCount) * DUST - fee,
     });
 
     let distributedTokens = 0n;
-    for (let index = 0; index < distroCount; index += 1) {
-      const folder = distro[index];
-      // The API returns amounts with up to 8 decimals of precision; the chain needs the
-      // non-decimal integer amount.
-      const tokenAmount = BigInt(Math.round(folder.amount * 100000000));
+    recipients.forEach(({ tokenAmount }, index) => {
       builder.addOutput({
-        to: folder.cashTokensAddress.startsWith('bitcoincash:')
-          ? folder.cashTokensAddress
-          : `bitcoincash:${folder.cashTokensAddress}`,
+        to: recipientAddresses[index],
         amount: DUST,
         token: {
           amount: tokenAmount,
@@ -152,7 +193,7 @@ export async function prepareDistributionTransaction({
         },
       });
       distributedTokens += tokenAmount;
-    }
+    });
 
     if (distributedTokens !== tokenInput.token.amount) {
       throw new AppError(
@@ -175,7 +216,7 @@ export async function prepareDistributionTransaction({
   const { builder: finalBuilder, distributedTokens } = build(fee);
   const hex = await finalBuilder.build();
 
-  const changeSatoshis = satoshis - BigInt(distroCount) * DUST - fee;
+  const changeSatoshis = satoshis - BigInt(recipientCount) * DUST - fee;
 
   return {
     transaction: finalBuilder,
@@ -183,6 +224,8 @@ export async function prepareDistributionTransaction({
     fee,
     changeSatoshis,
     distributedTokens,
+    recipientCount,
+    skippedCount,
   };
 }
 
@@ -197,7 +240,9 @@ export async function sendDistributionTransaction(transaction) {
 }
 
 function describeBroadcastError(cause) {
-  const message = cause?.message || String(cause);
+  // cashscript's FailedTransactionError appends a Bitauth URI to its message that embeds the private
+  // key, so only its reason is ever shown.
+  const message = cause?.reason || cause?.message || String(cause);
   if (/missing.?inputs|bad-txns-inputs-missingorspent|bad-txns-inputs-spent/i.test(message)) {
     return 'The wallet’s UTXOs have already been spent (perhaps by a previous run). Refresh and try again.';
   }

@@ -18,7 +18,10 @@ export default function ConfirmSendDialog({ open, summary, isSending, onCancel, 
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="confirm-send-title">Confirm distribution</h2>
-        <p>This will broadcast a real transaction. Double-check the totals before continuing.</p>
+        <p>
+          This will broadcast a real transaction on <strong>{summary.network}</strong>. Double-check the totals
+          before continuing.
+        </p>
         <dl className="confirm-summary">
           <dt>Recipients</dt>
           <dd>{formatNumber(summary.distroCount)}</dd>

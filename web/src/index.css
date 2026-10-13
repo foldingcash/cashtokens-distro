@@ -127,6 +127,11 @@ select {
   color: var(--brand-green);
 }
 
+.network-badge--test {
+  background: var(--primary-soft);
+  color: var(--primary-text);
+}
+
 .card {
   background: var(--surface);
   border: 1px solid var(--border);

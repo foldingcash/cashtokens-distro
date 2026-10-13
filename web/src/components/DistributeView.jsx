@@ -15,6 +15,7 @@ import DistroTable, { truncateAddress } from './DistroTable.jsx';
 import ErrorNotice from './ErrorNotice.jsx';
 import ConfirmSendDialog from './ConfirmSendDialog.jsx';
 import { formatNumber, satoshisToBch } from '../lib/format.js';
+import { explorerTxUrl } from '../lib/network.js';
 
 /**
  * Workflow 2: the amount is derived entirely from the CashToken UTXO sitting
@@ -51,8 +52,8 @@ export default function DistributeView() {
     setWalletInputs(null);
     setDistroAmount(null);
     try {
-      const inputs = await getWalletInputs(wallet.address);
-      const amount = getDistroAmountFromTokenInput(inputs.tokenInput);
+      const inputs = await getWalletInputs(wallet.address, wallet.network);
+      const amount = getDistroAmountFromTokenInput(inputs.tokenInput, settings.tokenDecimals);
       setWalletInputs(inputs);
       setDistroAmount(amount);
     } catch (err) {
@@ -60,13 +61,13 @@ export default function DistributeView() {
     } finally {
       setIsLoadingWallet(false);
     }
-  }, [wallet]);
+  }, [wallet, settings.tokenDecimals]);
 
   useEffect(() => {
     if (wallet) loadWalletInputs();
-    // Only re-run when the address actually changes (i.e. a new wallet is imported).
+    // Only re-run when a new wallet is imported or the token decimals change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wallet?.address]);
+  }, [wallet?.address, settings.tokenDecimals]);
 
   async function handleDateSubmit({ startDate, endDate }) {
     setIsLoadingReport(true);
@@ -92,12 +93,14 @@ export default function DistributeView() {
     try {
       const result = await prepareDistributionTransaction({
         address: wallet.address,
+        network: wallet.network,
         signatureTemplate: wallet.signatureTemplate,
         tokenInput: walletInputs.tokenInput,
         fundInput: walletInputs.fundInput,
         satoshis: walletInputs.satoshis,
         distroCount: report.distroCount,
         distro: report.distro,
+        decimals: settings.tokenDecimals,
       });
       setPrepared(result);
     } catch (err) {
@@ -139,6 +142,9 @@ export default function DistributeView() {
       </div>
     );
   }
+
+  const tokenScale = 10 ** settings.tokenDecimals;
+  const explorerUrl = sendResult ? explorerTxUrl(wallet.network, sendResult.txid) : null;
 
   const minimumSatoshis = report ? getMinimumSatoshisRequired(report.distroCount) : null;
   const hasEnoughFunds =
@@ -256,6 +262,14 @@ export default function DistributeView() {
             </dd>
             <dt>Change back to your wallet</dt>
             <dd>{satoshisToBch(prepared.changeSatoshis)} BCH</dd>
+            {prepared.skippedCount > 0 && (
+              <>
+                <dt>Recipients skipped</dt>
+                <dd>
+                  {prepared.skippedCount} (their share rounds to less than one base unit of the token)
+                </dd>
+              </>
+            )}
           </dl>
           <div className="button-row">
             <button type="button" className="button" onClick={() => setConfirmOpen(true)}>
@@ -279,13 +293,11 @@ export default function DistributeView() {
           <p>
             Transaction id: <code>{sendResult.txid}</code>
           </p>
-          <a
-            href={`https://blockchair.com/bitcoin-cash/transaction/${sendResult.txid}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            View on Blockchair
-          </a>
+          {explorerUrl && (
+            <a href={explorerUrl} target="_blank" rel="noreferrer">
+              View on block explorer
+            </a>
+          )}
           <div className="button-row">
             <button type="button" className="button button--secondary" onClick={handleReset}>
               Start another distribution
@@ -300,8 +312,9 @@ export default function DistributeView() {
         summary={
           prepared
             ? {
-                distroCount: report.distroCount,
-                totalTokens: Number(prepared.distributedTokens) / 100000000,
+                distroCount: prepared.recipientCount,
+                totalTokens: Number(prepared.distributedTokens) / tokenScale,
+                network: wallet.network,
                 fee: prepared.fee,
                 changeSatoshis: prepared.changeSatoshis,
               }

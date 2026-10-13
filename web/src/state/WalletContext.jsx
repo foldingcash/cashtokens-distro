@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { deriveWalletFromWif } from '../lib/wif.js';
+import { useSettings } from './SettingsContext.jsx';
 
 const WalletContext = createContext(null);
 
@@ -8,32 +9,41 @@ const WalletContext = createContext(null);
  * only, for the lifetime of this tab. Nothing here is ever written to
  * localStorage, sessionStorage, cookies, or any request — closing or
  * refreshing the tab discards it completely, and "Forget wallet" discards
- * it on demand.
+ * it on demand. Switching networks in Settings discards it too, since the
+ * key was imported (and its address derived) for the previous network.
  */
 export function WalletProvider({ children }) {
-  const [wallet, setWallet] = useState(null); // { address, signatureTemplate, pubKeyHex }
+  const { settings } = useSettings();
+  const [wallet, setWallet] = useState(null); // { address, signatureTemplate, pubKeyHex, network }
   const [error, setError] = useState(null);
   const [isImporting, setIsImporting] = useState(false);
 
-  const importWif = useCallback(async (wif) => {
-    setIsImporting(true);
-    setError(null);
-    try {
-      const derived = await deriveWalletFromWif(wif);
-      setWallet(derived);
-      return derived;
-    } catch (err) {
-      setError(err);
-      throw err;
-    } finally {
-      setIsImporting(false);
-    }
-  }, []);
+  const importWif = useCallback(
+    async (wif) => {
+      setIsImporting(true);
+      setError(null);
+      try {
+        const derived = await deriveWalletFromWif(wif, settings.network);
+        setWallet(derived);
+        return derived;
+      } catch (err) {
+        setError(err);
+        throw err;
+      } finally {
+        setIsImporting(false);
+      }
+    },
+    [settings.network],
+  );
 
   const forgetWallet = useCallback(() => {
     setWallet(null);
     setError(null);
   }, []);
+
+  useEffect(() => {
+    forgetWallet();
+  }, [settings.network, forgetWallet]);
 
   const value = useMemo(
     () => ({ wallet, error, isImporting, importWif, forgetWallet }),

@@ -15,8 +15,21 @@ npm run dev
 Then open the printed `http://localhost:5173` URL.
 
 By default it points at mainnet and `https://api.folding.cash/`, matching
-the root project's `config.json`. To change that, copy `.env.example` to
-`.env.local` and edit it.
+the root project's `config.json`. To change those defaults, copy
+`.env.example` to `.env.local` and edit it. Both, along with the token's
+decimal places, can also be changed in the app's Settings.
+
+## Testing on chipnet
+
+Switch the network to **chipnet** in Settings to try a full distribution
+with test coins. The app then reads keys and addresses as `bchtest:` and
+talks to a chipnet Electrum server. The distribution API still returns
+mainnet recipient addresses, so on chipnet each one is re-encoded with the
+`bchtest:` prefix — the same recipients, on the test network.
+
+If your chipnet test token was minted without decimals (e.g. 12000 base
+units meaning 12000 tokens), also set **Token decimals** to 0. The
+FoldingCash mainnet token uses 8.
 
 ## Wallet
 

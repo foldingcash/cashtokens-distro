@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DEFAULT_SETTINGS, useSettings } from '../state/SettingsContext.jsx';
-import { NETWORK } from '../config.js';
+import { SUPPORTED_NETWORKS } from '../lib/network.js';
 
 /** Returns the URL normalized with a trailing slash, or null if it isn't a valid http(s) URL. */
 function normalizeApiUrl(value) {
@@ -24,7 +24,11 @@ export default function SettingsDialog({ open, onClose }) {
   // Start from the saved settings each time the dialog opens.
   useEffect(() => {
     if (open) {
-      setDraft({ ...settings, reportAmount: String(settings.reportAmount) });
+      setDraft({
+        ...settings,
+        reportAmount: String(settings.reportAmount),
+        tokenDecimals: String(settings.tokenDecimals),
+      });
       setValidationError(null);
     }
   }, [open, settings]);
@@ -54,12 +58,21 @@ export default function SettingsDialog({ open, onClose }) {
       setValidationError('The report reference amount must be a whole number greater than 0.');
       return;
     }
-    updateSettings({ ...draft, apiUrl, reportAmount });
+    const tokenDecimals = Number(draft.tokenDecimals);
+    if (!Number.isInteger(tokenDecimals) || tokenDecimals < 0 || tokenDecimals > 18) {
+      setValidationError('Token decimals must be a whole number from 0 to 18.');
+      return;
+    }
+    updateSettings({ ...draft, apiUrl, reportAmount, tokenDecimals });
     onClose();
   }
 
   function handleReset() {
-    setDraft({ ...DEFAULT_SETTINGS, reportAmount: String(DEFAULT_SETTINGS.reportAmount) });
+    setDraft({
+      ...DEFAULT_SETTINGS,
+      reportAmount: String(DEFAULT_SETTINGS.reportAmount),
+      tokenDecimals: String(DEFAULT_SETTINGS.tokenDecimals),
+    });
     setValidationError(null);
   }
 
@@ -105,11 +118,37 @@ export default function SettingsDialog({ open, onClose }) {
           <span className="field-hint">Used by the Report tab to compute each recipient's share.</span>
         </label>
 
-        <div className="field">
+        <label className="field">
           <span>Network</span>
-          <span className="settings-form__static">{NETWORK}</span>
-          <span className="field-hint">Set with VITE_NETWORK in .env.local, since it changes how keys are read.</span>
-        </div>
+          <select value={draft.network} onChange={setField('network')}>
+            {SUPPORTED_NETWORKS.map((network) => (
+              <option key={network} value={network}>
+                {network}
+              </option>
+            ))}
+          </select>
+          <span className="field-hint">
+            Use chipnet to test a distribution without real funds. Changing the network forgets the imported
+            wallet, since keys and addresses differ between networks.
+          </span>
+        </label>
+
+        <label className="field">
+          <span>Token decimals</span>
+          <input
+            type="number"
+            min="0"
+            max="18"
+            step="1"
+            value={draft.tokenDecimals}
+            onChange={setField('tokenDecimals')}
+            required
+          />
+          <span className="field-hint">
+            Decimal places of the token being distributed. The FoldingCash token uses 8; a chipnet test token
+            minted without decimals uses 0.
+          </span>
+        </label>
 
         {validationError && <p className="field-error">{validationError}</p>}
 

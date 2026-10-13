@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import { DISTRO_API, DEFAULT_REPORT_AMOUNT } from '../config.js';
+import { DISTRO_API, DEFAULT_REPORT_AMOUNT, DEFAULT_TOKEN_DECIMALS, NETWORK } from '../config.js';
+import { isSupportedNetwork } from '../lib/network.js';
 
 const STORAGE_KEY = 'cashtokens-distro:settings';
 
@@ -8,6 +9,8 @@ export const DEFAULT_SETTINGS = {
   apiUrl: DISTRO_API,
   timeZone: 'UTC', // 'UTC' | 'local'
   reportAmount: DEFAULT_REPORT_AMOUNT,
+  network: NETWORK,
+  tokenDecimals: DEFAULT_TOKEN_DECIMALS,
 };
 
 const SettingsContext = createContext(null);
@@ -15,7 +18,9 @@ const SettingsContext = createContext(null);
 function loadSettings() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    return { ...DEFAULT_SETTINGS, ...(stored && typeof stored === 'object' ? stored : {}) };
+    const settings = { ...DEFAULT_SETTINGS, ...(stored && typeof stored === 'object' ? stored : {}) };
+    if (!isSupportedNetwork(settings.network)) settings.network = DEFAULT_SETTINGS.network;
+    return settings;
   } catch {
     return DEFAULT_SETTINGS;
   }

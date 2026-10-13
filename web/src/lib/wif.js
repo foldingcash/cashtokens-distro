@@ -7,10 +7,8 @@ import {
   encodeCashAddress,
 } from '@bitauth/libauth';
 import { SignatureTemplate, Network } from 'cashscript';
-import { NETWORK } from '../config.js';
+import { addressPrefix } from './network.js';
 import { AppError } from './errors.js';
-
-const isMainnetLike = NETWORK === Network.MAINNET;
 
 /**
  * Derives everything the app needs from a WIF private key: the signature
@@ -22,9 +20,10 @@ const isMainnetLike = NETWORK === Network.MAINNET;
  * and is discarded entirely when the wallet is "forgotten" or the tab closes.
  *
  * @param {string} wif
- * @throws {AppError} if the WIF is malformed, or doesn't match the configured network
+ * @param {string} network the cashscript network name, e.g. 'mainnet' or 'chipnet'
+ * @throws {AppError} if the WIF is malformed, or doesn't match the network
  */
-export async function deriveWalletFromWif(wif) {
+export async function deriveWalletFromWif(wif, network) {
   const trimmed = (wif || '').trim();
   if (!trimmed) {
     throw new AppError('invalid-wif', 'Enter a WIF private key.');
@@ -36,11 +35,11 @@ export async function deriveWalletFromWif(wif) {
   }
 
   const wifIsMainnet = decodedWif.type === 'mainnet' || decodedWif.type === 'mainnetUncompressed';
-  if (wifIsMainnet !== isMainnetLike) {
+  if (wifIsMainnet !== (network === Network.MAINNET)) {
     throw new AppError(
       'network-mismatch',
       `This key is for ${wifIsMainnet ? 'mainnet' : 'testnet'}, but the app is configured for ` +
-        `"${NETWORK}". Double-check VITE_NETWORK before importing a key for the wrong network.`,
+        `"${network}". Switch the network in Settings before importing this key.`,
     );
   }
 
@@ -55,10 +54,10 @@ export async function deriveWalletFromWif(wif) {
   const pubKeyHex = binToHex(pubKeyBin);
   const pubKeyHash = ripemd160.hash(sha256.hash(pubKeyBin));
   const { address } = encodeCashAddress({
-    prefix: isMainnetLike ? 'bitcoincash' : 'bchtest',
+    prefix: addressPrefix(network),
     type: 'p2pkhWithTokens',
     payload: pubKeyHash,
   });
 
-  return { address, signatureTemplate, pubKeyHex };
+  return { address, signatureTemplate, pubKeyHex, network };
 }
