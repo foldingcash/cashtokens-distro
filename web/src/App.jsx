@@ -16,7 +16,10 @@ export default function App() {
       <WalletProvider>
         <div className="app">
           <header className="app__header">
-            <h1>FoldingCash Token Distribution</h1>
+            <h1>
+              Folding<span className="brand-accent">Cash</span>{' '}
+              <span className="app__title-sub">Token Distribution</span>
+            </h1>
             <div className="app__header-actions">
               <span className="network-badge" title="Configured via VITE_NETWORK">
                 {NETWORK}
